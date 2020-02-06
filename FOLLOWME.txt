@@ -1,0 +1,159 @@
+# Raspberry Pi aarch64
+https://github.com/openfans-community-offical/Debian-Pi-Aarch64
+
+sudo passwd # set passward
+sudo apt-get update
+sudo apt-get install r-base
+sudo apt-get install aptitude
+sudo aptitude install build-essential # enter 'n', then enter 'y'
+
+
+-------------------
+#rstudio-server#
+-------------------
+# [download Rstudio source]
+mkdir Downloads
+cd Downloads
+wget https://github.com/rstudio/rstudio/tarball/v1.2.5033
+tar -zxvf v1.2.5033
+mv rstudio-rstudio-330255d rstudio
+# [finish download]
+
+# [install cmake]
+wget https://cmake.org/files/v3.15/cmake-3.15.3.tar.gz # Check for the latest version on https://cmake.org/files/
+tar xzf cmake-3.15.3.tar.gz
+cd cmake-3.15.3
+./configure; make
+sudo make install
+cd
+# [finish cmake]
+
+
+# [install libssl1.0-dev]
+wget http://security.debian.org/debian-security/pool/updates/main/o/openssl1.0/libssl1.0.2_1.0.2u-1~deb9u1_arm64.deb
+sudo apt-get install ./libssl1.0.2_1.0.2u-1~deb9u1_arm64.deb
+wget http://security.debian.org/debian-security/pool/updates/main/o/openssl1.0/libssl1.0-dev_1.0.2u-1~deb9u1_arm64.deb
+sudo apt-get install ./libssl1.0-dev_1.0.2u-1~deb9u1_arm64.deb
+# [finish libssl1.0-dev]
+
+# [install and change to java8]
+sid-used sudo apt-get install openjdk-8-jdk
+sudo update-alternatives --config java # enter '2', then press enter
+# [finish java8]
+
+# [install other dependencies]
+cd rstudio/dependencies/linux
+./install-dependencies-debian --exclude-qt-sdk
+cd ../../
+mkdir build 
+cd build
+cmake .. -DRSTUDIO_TARGET=Server -DCMAKE_BUILD_TYPE=Release
+#[finish dependencies]
+
+# [install Rstudio]
+su - # enter passward
+cd /home/pi/Downloads/rstudio/build
+make install # add '-j4' after to speed up
+# [finish installation Rstudio]
+
+# [configure Rstudio]
+cd
+useradd -r rstudio-server
+cp /usr/local/lib/rstudio-server/extras/init.d/debian/rstudio-server /etc/init.d/rstudio-server
+chmod +x /etc/init.d/rstudio-server 
+update-rc.d rstudio-server defaults
+ln -f -s /usr/local/lib/rstudio-server/bin/rstudio-server /usr/sbin/rstudio-server
+chmod 777 -R /usr/local/lib/R/site-library/
+mkdir -p /var/run/rstudio-server
+mkdir -p /var/lock/rstudio-server
+mkdir -p /var/log/rstudio-server
+mkdir -p /var/lib/rstudio-server
+rm -rf /home/pi/rstudio
+nano /etc/init.d/rstudio-server
+    # Modify your PATH for using the compiled version of R
+        # PATH=/usr/local/bin/:/sbin:/usr/sbin:/bin:/usr/bin
+systemctl daemon-reload
+rstudio-server start
+exit
+# [finish configuration Rstudio]
+
+------------------
+#shiny-server#
+------------------
+# [install dependencies]
+sudo su - -c "R -e \"install.packages('later', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('fs', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('Rcpp', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('httpuv', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('mime', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('jsonlite', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('digest', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('htmltools', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('xtable', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('R6', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('Cairo', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('sourcetools', repos='http://cran.rstudio.com/')\""
+sudo su - -c "R -e \"install.packages('shiny', repos='http://cran.rstudio.com/')\""
+# [finish dependencies]
+
+# [download shiny-server source]
+git clone https://github.com/rstudio/shiny-server.git
+cd shiny-server
+# [finish download]
+
+# [find a suitable version of node]
+sudo vim ./external/node/install-node.sh
+# SHA265=6cd28a5e6340f596aec8dbfd6720f444f011e6b9018622290a60dbd17f9baff6
+# local NODE_URL="https://nodejs.org/dist/v12.14.1/node-v12.14.1-linux-arm64.tar.xz"
+# save and quit
+# [finish node]
+
+# [install shiny-server]
+DIR=`pwd`
+PATH=$DIR/bin:$PATH
+mkdir tmp
+cd tmp
+PYTHON=`which python`
+sudo cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DPYTHON="$PYTHON" ../
+sudo make
+mkdir ../build
+(cd .. && sudo ./external/node/install-node.sh)
+(cd .. && ./bin/npm --python="${PYTHON}" install --no-optional)
+(cd .. && ./bin/npm --python="${PYTHON}" rebuild)
+sudo make install
+# [finish installation shiny-server]
+
+# [configure shiny-server]
+cd
+sudo ln -s /usr/local/shiny-server/bin/shiny-server /usr/bin/shiny-server
+sudo useradd -r -m shiny
+sudo mkdir -p /var/log/shiny-server
+sudo mkdir -p /srv/shiny-server
+sudo mkdir -p /var/lib/shiny-server
+sudo chown shiny /var/log/shiny-server
+sudo mkdir -p /etc/shiny-server
+cd
+sudo wget \
+https://raw.github.com/rstudio/shiny-server/master/config/upstart/shiny-server.conf \
+-O /etc/init/shiny-server.conf
+sudo chmod 777 -R /srv
+# Configure shiny-server autostart 
+sudo nano /lib/systemd/system/shiny-server.service # Paste the following
+    #!/usr/bin/env bash
+    [Unit]
+    Description=ShinyServer
+    [Service]
+    Type=simple
+    ExecStart=/usr/bin/shiny-server
+    Restart=always
+    # Environment="LANG=en_US.UTF-8"
+    ExecReload=/bin/kill -HUP $MAINPID
+    ExecStopPost=/bin/sleep 5
+    RestartSec=1
+    [Install]
+    WantedBy=multi-user.target
+sudo chown shiny /lib/systemd/system/shiny-server.service
+sudo systemctl daemon-reload
+sudo systemctl enable shiny-server
+sudo systemctl start shiny-server
+# [finish configuration shiny-server]
